@@ -7,6 +7,9 @@
 
 select((select(STDOUT), $|=1)[0]);
 $sw_perl_path = perl ;
+$sw_tirpc_inc = "";
+$sw_tirpc_lib = "";
+$sw_tirpc_libdir = "";
 $sw_netcdf_path = "" ;
 $sw_netcdff_path = "" ;
 $sw_pnetcdf_path = "" ;
@@ -60,6 +63,15 @@ while ( substr( $ARGV[0], 0, 1 ) eq "-" )
   if ( substr( $ARGV[0], 1, 5 ) eq "perl=" )
   {
     $sw_perl_path = substr( $ARGV[0], 6 ) ;
+  }
+  if ( substr( $ARGV[0], 1, 10 ) eq "tirpc_inc=" )
+  {
+    $sw_tirpc_inc = substr( $ARGV[0], 11 ) ;
+  }
+  if ( substr( $ARGV[0], 1, 10 ) eq "tirpc_lib=" )
+  {
+    $sw_tirpc_libdir = substr( $ARGV[0], 11 ) ;
+    $sw_tirpc_lib = "-ltirpc" ;
   }
   if ( substr( $ARGV[0], 1, 7 ) eq "netcdf=" )
   {
@@ -450,6 +462,8 @@ while ( <CONFIGURE_DEFAULTS> )
   if ( $latchon == 1 )
   {
     $_ =~ s/CONFIGURE_PERL_PATH/$sw_perl_path/g ;
+    $_ =~ s/CONFIGURE_TIRPC_INC/$sw_tirpc_inc/g ;
+    $_ =~ s/CONFIGURE_TIRPC_LIB/$sw_tirpc_libdir $sw_tirpc_lib/g ;
     $_ =~ s/CONFIGURE_NETCDF_PATH/$sw_netcdf_path/g ;
     $_ =~ s/CONFIGURE_NETCDFF_PATH/$sw_netcdff_path/g ;
     $_ =~ s/CONFIGURE_PNETCDF_PATH/$sw_pnetcdf_path/g ;
