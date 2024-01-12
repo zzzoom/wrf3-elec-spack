@@ -8,6 +8,7 @@
 select((select(STDOUT), $|=1)[0]);
 $sw_perl_path = perl ;
 $sw_netcdf_path = "" ;
+$sw_netcdff_path = "" ;
 $sw_pnetcdf_path = "" ;
 $sw_hdf5_path=""; 
 $sw_phdf5_path=""; 
@@ -64,6 +65,10 @@ while ( substr( $ARGV[0], 0, 1 ) eq "-" )
   {
     $sw_netcdf_path = substr( $ARGV[0], 8 ) ;
   }
+  if (substr( $ARGV[0], 1, 8) eq "netcdff=" )
+  {
+    $sw_netcdff_path = substr( $ARGV[0], 9) ;
+  }
   if ( substr( $ARGV[0], 1, 13 ) eq "dep_lib_path=" )
   {
     $sw_dep_lib_path = substr( $ARGV[0], 14 ) ;
@@ -118,6 +123,7 @@ while ( substr( $ARGV[0], 0, 1 ) eq "-" )
   if ( substr( $ARGV[0], 1, 11 ) eq "USENETCDFF=" )
   {
     $sw_usenetcdff = substr( $ARGV[0], 12 ) ;
+    $sw_usenetcdff =~ s/!/ /g ;
   }
   if ( substr( $ARGV[0], 1, 10 ) eq "USENETCDF=" )
   {
@@ -445,6 +451,7 @@ while ( <CONFIGURE_DEFAULTS> )
   {
     $_ =~ s/CONFIGURE_PERL_PATH/$sw_perl_path/g ;
     $_ =~ s/CONFIGURE_NETCDF_PATH/$sw_netcdf_path/g ;
+    $_ =~ s/CONFIGURE_NETCDFF_PATH/$sw_netcdff_path/g ;
     $_ =~ s/CONFIGURE_PNETCDF_PATH/$sw_pnetcdf_path/g ;
     $_ =~ s/CONFIGURE_HDF5_PATH/$sw_hdf5_path/g ;
     $_ =~ s/CONFIGURE_PHDF5_PATH/$sw_phdf5_path/g ;

@@ -305,6 +305,15 @@ if [ -n "$NETCDF" ] ; then
   else
     USENETCDF=" "
   fi
+  # for netCDF 4.2 and greater, the Fortran library is a separate install
+  if [ -z "$NETCDFF" ]; then
+    NETCDFF="$NETCDF"
+  fi
+  if [ -f "$NETCDFF/lib/libnetcdff.a" ] ; then
+    USENETCDFF="-L$NETCDFF/lib!-lnetcdff" # ! will be replaced with space
+  fi
+  export USENETCDF=$USENETCDF
+  export USENETCDFF=$USENETCDFF
 else
   echo "Will configure for use without NetCDF"
 fi
@@ -631,10 +640,11 @@ if test -n "$PERL" ; then
    srch=`grep -i "^#ARCH.*$os" arch/configure_new.defaults | grep -i "$mach"`
    if [ -n "$srch" ] ; then
      $PERL arch/Config_new.pl -dmparallel=$COMMLIB -ompparallel=$OMP -perl=$PERL \
-          -netcdf=$NETCDF -pnetcdf=$PNETCDF -hdf5=$HDF5 -phdf5=$PHDF5 -os=$os -mach=$mach -ldflags=$ldflags \
-          -compileflags=$compileflags -opt_level=$opt_level -USENETCDFF=$USENETCDFF -USENETCDF=$USENETCDF \
-          -time=$FORTRAN_COMPILER_TIMER -tfl="$TFL" -cfl="$CFL" -config_line="$config_line" \
-          -wrf_core=$wrf_core -gpfs=$GPFS_PATH -curl=$CURL_PATH -dep_lib_path="$DEP_LIB_PATH"
+          -netcdf=$NETCDF -netcdff=$NETCDFF -pnetcdf=$PNETCDF -hdf5=$HDF5 -phdf5=$PHDF5 -os=$os \
+               -mach=$mach -ldflags=$ldflags -compileflags=$compileflags -opt_level=$opt_level \
+               -USENETCDFF=$USENETCDFF -USENETCDF=$USENETCDF -time=$FORTRAN_COMPILER_TIMER \
+               -tfl="$TFL" -cfl="$CFL" -config_line="$config_line" -wrf_core=$wrf_core \
+               -gpfs=$GPFS_PATH -curl=$CURL_PATH -dep_lib_path="$DEP_LIB_PATH"
      if test ! -f configure.wrf ; then
        echo "configure.wrf not created! Exiting configure script..."
        exit 1
@@ -744,10 +754,10 @@ echo "If you wish to change settings, please edit that file."
 echo "If you wish to change the default options, edit the file:"
 echo "     arch/configure_new.defaults"
 
-if test -n "$NETCDF" ; then
-  if [ ! -f $NETCDF/include/netcdf.inc ] ; then
+if test -n "$NETCDFF" ; then
+  if [ ! -f $NETCDFF/include/netcdf.inc ] ; then
     echo
-    echo "Error : Not found $NETCDF/include/netcdf.inc"
+    echo "Error : Not found $NETCDFF/include/netcdf.inc"
     echo "        Please check this installation of NetCDF and re-run this configure script"
     echo
     if test -n "$NETCDF4" ; then
@@ -756,7 +766,7 @@ if test -n "$NETCDF" ; then
     fi
     exit -1
   fi
-  grep nf_format_64bit $NETCDF/include/netcdf.inc > /dev/null
+  grep nf_format_64bit $NETCDFF/include/netcdf.inc > /dev/null
   configure_aaaa=$? ; export configure_aaaa
   if [ $configure_aaaa -a -z "$WRFIO_NCD_NO_LARGE_FILE_SUPPORT" ] ; then
     echo "NetCDF users note:"
@@ -1089,6 +1099,42 @@ if [ $retval -ne 0 ] ; then
   echo "There are some Fortran 2008 features in WRF that your compiler does not recognize"
   echo "The intrinsic gamma function is not available, required by some schemes."
   echo "That code is stubbbed out, and those schemes are unavailable at run-time."
+  echo " "
+  echo "*****************************************************************************"
+fi
+
+# testing for location of rpc/types.h file, used in landuse
+if [ -f /usr/include/rpc/types.h ] ; then
+  sed -e '/^ARCH_LOCAL/s/$/ -DRPC_TYPES=1/' configure.wrf > configure.wrf.edit
+  mv configure.wrf.edit configure.wrf
+echo standard location of RPC
+elif [ -f /usr/include/tirpc/rpc/types.h ] ; then
+  sed -e '/^ARCH_LOCAL/s/$/ -DRPC_TYPES=2/' configure.wrf > configure.wrf.edit
+  mv configure.wrf.edit configure.wrf
+echo newer location of RPC
+else
+  echo "************************** W A R N I N G ************************************"
+  echo " "
+  echo "The moving nest option is not available due to missing rpc/types.h file."
+  echo "Copy landread.c.dist to landread.c in share directory to bypass compile error."
+  echo " "
+  echo "*****************************************************************************"
+fi
+
+# testing for location of rpc/types.h file, used in landuse
+if [ -f /usr/include/rpc/types.h ] ; then
+  sed -e '/^ARCH_LOCAL/s/$/ -DRPC_TYPES=1/' configure.wrf > configure.wrf.edit
+  mv configure.wrf.edit configure.wrf
+echo standard location of RPC
+elif [ -f /usr/include/tirpc/rpc/types.h ] ; then
+  sed -e '/^ARCH_LOCAL/s/$/ -DRPC_TYPES=2/' configure.wrf > configure.wrf.edit
+  mv configure.wrf.edit configure.wrf
+echo newer location of RPC
+else
+  echo "************************** W A R N I N G ************************************"
+  echo " "
+  echo "The moving nest option is not available due to missing rpc/types.h file."
+  echo "Copy landread.c.dist to landread.c in share directory to bypass compile error."
   echo " "
   echo "*****************************************************************************"
 fi

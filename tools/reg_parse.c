@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #ifdef _WIN32
 # define rindex(X,Y) strrchr(X,Y)
 # define index(X,Y) strchr(X,Y)
@@ -92,7 +93,7 @@ pre_parse( char * dir, FILE * infile, FILE * outfile )
 {
   /* Decreased size for SOA from 8192 to 8000--double check if necessary, Manish Shrivastava 2010 */
   char inln[8000], parseline[8000], parseline_save[8000] ;
-  int found ; 
+  int found ;
   char *p, *q ;
   char *tokens[MAXTOKENS], *toktmp[MAXTOKENS], newdims[NAMELEN_LONG], newdims4d[NAMELEN_LONG],newname[NAMELEN_LONG] ;
   int i, ii, len_of_tok ;
@@ -131,7 +132,7 @@ pre_parse( char * dir, FILE * infile, FILE * outfile )
           fclose( include_fp ) ;
         } else {
           fprintf(stderr,"Registry warning: cannot open %s. Ignoring.\n", include_file_name ) ;
-        } 
+        }
       }
     }
     else if ( !strncmp( p , "ifdef", 5 ) ) {
@@ -139,7 +140,7 @@ pre_parse( char * dir, FILE * infile, FILE * outfile )
       p += 5 ; for ( ; ( *p == ' ' || *p == '	' ) && *p != '\0' ; p++ ) ;
       strncpy(value, p, 31 ) ; value[31] = '\0' ;
       if ( (p=index(value,'\n')) != NULL ) *p = '\0' ;
-      if ( (p=index(value,' ')) != NULL ) *p = '\0' ; if ( (p=index(value,'	')) != NULL ) *p = '\0' ; 
+      if ( (p=index(value,' ')) != NULL ) *p = '\0' ; if ( (p=index(value,'	')) != NULL ) *p = '\0' ;
       ifdef_stack_ptr++ ;
       ifdef_stack[ifdef_stack_ptr] = ( sym_get(value) != NULL && ifdef_stack[ifdef_stack_ptr-1] ) ;
       if ( ifdef_stack_ptr >= 100 ) { fprintf(stderr,"Registry fatal: too many nested ifdefs\n") ; exit(1) ; }
@@ -150,14 +151,14 @@ pre_parse( char * dir, FILE * infile, FILE * outfile )
       p += 6 ; for ( ; ( *p == ' ' || *p == '	' ) && *p != '\0' ; p++ ) ;
       strncpy(value, p, 31 ) ; value[31] = '\0' ;
       if ( (p=index(value,'\n')) != NULL ) *p = '\0' ;
-      if ( (p=index(value,' ')) != NULL ) *p = '\0' ; if ( (p=index(value,'	')) != NULL ) *p = '\0' ; 
+      if ( (p=index(value,' ')) != NULL ) *p = '\0' ; if ( (p=index(value,'	')) != NULL ) *p = '\0' ;
       ifdef_stack_ptr++ ;
       ifdef_stack[ifdef_stack_ptr] = ( sym_get(value) == NULL && ifdef_stack[ifdef_stack_ptr-1] ) ;
       if ( ifdef_stack_ptr >= 100 ) { fprintf(stderr,"Registry fatal: too many nested ifdefs\n") ; exit(1) ; }
       continue ;
     }
     else if ( !strncmp( p , "endif", 5 ) ) {
-      ifdef_stack_ptr-- ; 
+      ifdef_stack_ptr-- ;
       if ( ifdef_stack_ptr < 0 ) { fprintf(stderr,"Registry fatal: unmatched endif\n") ; exit(1) ; }
       continue ;
     }
@@ -166,7 +167,7 @@ pre_parse( char * dir, FILE * infile, FILE * outfile )
       p += 6 ; for ( ; ( *p == ' ' || *p == '	' ) && *p != '\0' ; p++ ) ;
       strncpy(value, p, 31 ) ; value[31] = '\0' ;
       if ( (p=index(value,'\n')) != NULL ) *p = '\0' ;
-      if ( (p=index(value,' ')) != NULL ) *p = '\0' ; if ( (p=index(value,'	')) != NULL ) *p = '\0' ; 
+      if ( (p=index(value,' ')) != NULL ) *p = '\0' ; if ( (p=index(value,'	')) != NULL ) *p = '\0' ;
       sym_add( value ) ;
       continue ;
     }
@@ -223,7 +224,7 @@ pre_parse( char * dir, FILE * infile, FILE * outfile )
         int inbrace = 0 ;
         strcpy( newdims, "" ) ;
         strcpy( newdims4d, "" ) ;
-        is4d = 0 ; wantstend = 0 ; wantsbdy = 0 ; 
+        is4d = 0 ; wantstend = 0 ; wantsbdy = 0 ;
         for ( i = 0 ; i < (len_of_tok = strlen(tokens[F_DIMS])) ; i++ )
         {
           x = tolower(tokens[F_DIMS][i]) ;
@@ -252,7 +253,7 @@ pre_parse( char * dir, FILE * infile, FILE * outfile )
 /* next, output some additional entries for the boundary arrays for these guys */
             if ( is4d == 1 ) {
               for ( i = 0, found = 0 ; i < ntracers ; i++ ) {
-	        if ( !strcmp( tokens[F_USE] , tracers[i] ) ) found = 1 ; 
+	        if ( !strcmp( tokens[F_USE] , tracers[i] ) ) found = 1 ;
               }
 	      if ( found == 0 ) {
 	        sprintf(tracers[ntracers],tokens[F_USE]) ;
@@ -304,7 +305,7 @@ reg_parse( FILE * infile )
   /* Had to increase size for SOA from 4096 to 7000, Manish Shrivastava 2010 */
   char inln[7000], parseline[7000] ;
   char *p, *q ;
-  char *tokens[MAXTOKENS], *toktmp[MAXTOKENS] ; 
+  char *tokens[MAXTOKENS], *toktmp[MAXTOKENS] ;
   int i, ii, idim ;
   int defining_state_field, defining_rconfig_field, defining_i1_field ;
 
@@ -316,7 +317,7 @@ reg_parse( FILE * infile )
 /* Had to increase size for SOA from 4096 to 7000, Manish Shrivastava 2010 */
   while ( fgets ( inln , 7000 , infile ) != NULL )
   {
-    strcat( parseline , inln ) ; 
+    strcat( parseline , inln ) ;
     /* allow \ to continue the end of a line */
     if (( p = index( parseline,  '\\'  )) != NULL )
     {
@@ -330,10 +331,10 @@ reg_parse( FILE * infile )
     make_lower( parseline ) ;
     if (( p = index( parseline , '#' ))  != NULL  ) *p = '\0' ; /* discard comments (dont worry about quotes for now) */
     if (( p = index( parseline , '\n' )) != NULL  ) *p = '\0' ; /* discard newlines */
-    for ( i = 0 ; i < MAXTOKENS ; i++ ) tokens[i] = NULL ; 
+    for ( i = 0 ; i < MAXTOKENS ; i++ ) tokens[i] = NULL ;
     i = 0 ;
 
-    if ((tokens[i] = my_strtok(parseline)) != NULL ) i++ ; 
+    if ((tokens[i] = my_strtok(parseline)) != NULL ) i++ ;
 
     while (( tokens[i] = my_strtok(NULL) ) != NULL && i < MAXTOKENS ) i++ ;
     if ( i <= 0 ) continue ;
@@ -362,7 +363,7 @@ reg_parse( FILE * infile )
       tokens[TABLE] = "typedef" ;
       for ( i = MAXTOKENS-1 ; i >= 2 ; i-- ) tokens[i] = tokens[i-1] ; /* shift the fields to the left */
       tokens[FIELD_OF] = "domain" ;
-                 if ( !strcmp( tokens[FIELD_TYPE], "double" ) ) tokens[FIELD_TYPE] = "doubleprecision" ; 
+                 if ( !strcmp( tokens[FIELD_TYPE], "double" ) ) tokens[FIELD_TYPE] = "doubleprecision" ;
       defining_state_field = 1 ;
     }
     if      ( !strcmp( tokens[ TABLE ] , "rconfig" ) )
@@ -383,7 +384,7 @@ reg_parse( FILE * infile )
       tokens[TABLE] = "typedef" ;
       tokens[FIELD_OF]       = "domain" ;
       tokens[RCNF_TYPE]      = toktmp[RCNF_TYPE_PRE] ;
-                 if ( !strcmp( tokens[RCNF_TYPE], "double" ) ) tokens[RCNF_TYPE] = "doubleprecision" ; 
+                 if ( !strcmp( tokens[RCNF_TYPE], "double" ) ) tokens[RCNF_TYPE] = "doubleprecision" ;
       tokens[RCNF_SYM]       = toktmp[RCNF_SYM_PRE] ;
       tokens[RCNF_IO]        = toktmp[RCNF_IO_PRE] ;
       tokens[RCNF_DNAME]     = toktmp[RCNF_DNAME_PRE] ;
@@ -397,13 +398,13 @@ reg_parse( FILE * infile )
     }
     if      ( !strcmp( tokens[ TABLE ] , "i1" ) )
     {
-      /* turn a state entry into a typedef to define a field in 
+      /* turn a state entry into a typedef to define a field in
          the top-level built-in type domain */
       tokens[TABLE] = "typedef" ;
       /* shift the fields to the left */
-      for ( i = MAXTOKENS-1 ; i >= 2 ; i-- ) tokens[i] = tokens[i-1] ; 
+      for ( i = MAXTOKENS-1 ; i >= 2 ; i-- ) tokens[i] = tokens[i-1] ;
       tokens[FIELD_OF] = "domain" ;
-                 if ( !strcmp( tokens[FIELD_TYPE], "double" ) ) tokens[FIELD_TYPE] = "doubleprecision" ; 
+                 if ( !strcmp( tokens[FIELD_TYPE], "double" ) ) tokens[FIELD_TYPE] = "doubleprecision" ;
       defining_i1_field = 1 ;
     }
 
@@ -415,13 +416,13 @@ reg_parse( FILE * infile )
       node_t * field_struct ;
       node_t * type_struct ;
 
-      if ( !defining_state_field && ! defining_i1_field && 
+      if ( !defining_state_field && ! defining_i1_field &&
            !defining_rconfig_field && !strcmp(tokens[FIELD_OF],"domain") )
        { fprintf(stderr,"Registry warning: 'domain' is a reserved registry type name. Cannot 'typedef domain'\n") ; }
 
       type_struct = get_type_entry( tokens[ FIELD_OF ] ) ;
-      if ( type_struct == NULL ) 
-      {  
+      if ( type_struct == NULL )
+      {
         type_struct = new_node( TYPE ) ;
         strcpy( type_struct->name, tokens[FIELD_OF] ) ;
         type_struct->type_type = DERIVED ;
@@ -469,7 +470,7 @@ reg_parse( FILE * infile )
       }
 
       field_struct->restart  = 0 ; field_struct->boundary  = 0 ;
-      for ( i = 0 ; i < MAX_STREAMS ; i++ ) { 
+      for ( i = 0 ; i < MAX_STREAMS ; i++ ) {
         reset_mask( field_struct->io_mask, i ) ;
       }
 
@@ -494,14 +495,14 @@ reg_parse( FILE * infile )
             mask = field_struct->io_mask ;
             set_mask( mask , stream ) ;
             strcpy(tmp1, &(tmp[++i])) ;
-            for ( p = tmp1  ; *p ; i++, p++ ) { 
+            for ( p = tmp1  ; *p ; i++, p++ ) {
               c = tolower(*p) ; if ( c >= 'a' && c <= 'z' ) { *p = '\0' ; i-- ; break ; }
               reset_mask( mask , stream ) ;
             }
-            for ( p = tmp1  ; *p ; p++ ) { 
+            for ( p = tmp1  ; *p ; p++ ) {
               x = *p ;
-              if ( x >= '0' && x <= '9' ) { 
-                set_mask( mask , stream + x - '0' ) ; 
+              if ( x >= '0' && x <= '9' ) {
+                set_mask( mask , stream + x - '0' ) ;
               }
 	      else if ( x == '{' ) {
                 strcpy(tmp2,p+1) ;
@@ -529,7 +530,7 @@ reg_parse( FILE * infile )
             int ii,iii ;
             char * pp ;
             char tmp[NAMELEN] ;
-            strcpy(tmp,tokens[FIELD_IO]) ;   
+            strcpy(tmp,tokens[FIELD_IO]) ;
 
             if (( pp = index(tmp,'}') ) != NULL ) {
               *pp = '\0' ;
@@ -553,9 +554,9 @@ reg_parse( FILE * infile )
 	  } else if ( x >= 'a' && x <= 'z' ) {
 	    if ( x == 'r' ) { field_struct->restart = 1 ; set_mask( field_struct->io_mask , RESTART_STREAM   ) ; }
 	    if ( x == 'b' ) { field_struct->boundary  = 1 ; set_mask( field_struct->io_mask , BOUNDARY_STREAM   ) ; }
-	    if ( x == 'f' || x == 'd' || x == 'u' || x == 's' ) { 
+	    if ( x == 'f' || x == 'd' || x == 'u' || x == 's' ) {
                                strcpy(aux_fields,"") ;
-                               strcpy(fcn_name,"") ; 
+                               strcpy(fcn_name,"") ;
 	                       if ( tokens[FIELD_IO][i+1] == '(' )     /* catch a possible error */
                                {
 				 fprintf(stderr,
@@ -564,7 +565,7 @@ reg_parse( FILE * infile )
 				    "                  equal sign needed before left paren\n") ;
 			       }
 
-	                       if ( tokens[FIELD_IO][i+1] == '=' ) 
+	                       if ( tokens[FIELD_IO][i+1] == '=' )
 			       {
 				 int ii, jj, state ;
 				 state = 0 ;
@@ -629,7 +630,7 @@ reg_parse( FILE * infile )
                                    fprintf(stderr,"ERROR: %s %c function invalid.  You must specify the function to call in f=, d=, u= or s= when using the NMM cores.  The ARW interp functions do not correctly handle the E grid.\n",tokens[FIELD_SYM],x);
                                    exit(1);
                                  } else {
-                                   /*  warning should no longer be needed 
+                                   /*  warning should no longer be needed
                                       fprintf(stderr,"WARNING: %c interpolation unspecified for %s.  Using %s.\n",
                                            x,tokens[FIELD_SYM],fcn_name);
                                    */
@@ -652,23 +653,23 @@ reg_parse( FILE * infile )
                                  exit(1);
                                }
 #endif
-	                       if      ( x == 'f' )  { 
-                                 field_struct->nest_mask |= FORCE_DOWN ; 
+	                       if      ( x == 'f' )  {
+                                 field_struct->nest_mask |= FORCE_DOWN ;
                                  strcpy(field_struct->force_fcn_name, fcn_name ) ;
                                  strcpy(field_struct->force_aux_fields, aux_fields ) ;
                                }
-                               else if ( x == 'd' )  { 
-                                 field_struct->nest_mask |= INTERP_DOWN ; 
+                               else if ( x == 'd' )  {
+                                 field_struct->nest_mask |= INTERP_DOWN ;
                                  strcpy(field_struct->interpd_fcn_name, fcn_name ) ;
                                  strcpy(field_struct->interpd_aux_fields, aux_fields ) ;
                                }
-                               else if ( x == 's' )  { 
-                                 field_struct->nest_mask |= SMOOTH_UP ; 
+                               else if ( x == 's' )  {
+                                 field_struct->nest_mask |= SMOOTH_UP ;
                                  strcpy(field_struct->smoothu_fcn_name, fcn_name ) ;
                                  strcpy(field_struct->smoothu_aux_fields, aux_fields ) ;
                                }
-                               else if ( x == 'u' )  { 
-                                 field_struct->nest_mask |= INTERP_UP ; 
+                               else if ( x == 'u' )  {
+                                 field_struct->nest_mask |= INTERP_UP ;
                                  strcpy(field_struct->interpu_fcn_name, fcn_name ) ;
                                  strcpy(field_struct->interpu_aux_fields, aux_fields ) ;
                                }
@@ -726,12 +727,12 @@ reg_parse( FILE * infile )
       }
 /**/  else   /* if ( field_struct->scalar_array_member ) */
       {
-/* 
+/*
    Here we are constructing a list of nodes to represent the list of 4D scalar arrays in the model
 
    This list is rooted at the FourD pointer.
    Each array is represented by its own node; each node has a pointer, members, to the list
-   of fields that make it up.  
+   of fields that make it up.
 
 */
 	node_t * q , * member  ;
@@ -828,7 +829,7 @@ reg_parse( FILE * infile )
 #if 1
       for ( i = COMM_DEFINE, q=comm_struct->comm_define ; strcmp(tokens[i],"-") ; i++ )  {
         for(p=tokens[i];*p;p++)if(*p!=' '&&*p!='\t'){*q++=*p;}
-      } 
+      }
 #else
       strcpy( comm_struct->comm_define , tokens[COMM_DEFINE] ) ;
 #endif
@@ -843,7 +844,7 @@ reg_parse( FILE * infile )
 #if 1
       for ( i = COMM_DEFINE, q=comm_struct->comm_define ; strcmp(tokens[i],"-") ; i++ )  {
         for(p=tokens[i];*p;p++)if(*p!=' '&&*p!='\t'){*q++=*p;}
-      } 
+      }
 #else
       strcpy( comm_struct->comm_define , tokens[COMM_DEFINE] ) ;
 #endif
@@ -858,7 +859,7 @@ reg_parse( FILE * infile )
 #if 1
       for ( i = COMM_DEFINE, q=comm_struct->comm_define ; strcmp(tokens[i],"-") ; i++ )  {
         for(p=tokens[i];*p;p++)if(*p!=' '&&*p!='\t'){*q++=*p;}
-      } 
+      }
 #else
       strcpy( comm_struct->comm_define , tokens[COMM_DEFINE] ) ;
 #endif
@@ -995,9 +996,9 @@ set_dim_orient ( char * dimorient , node_t * dim_entry )
 {
   if      (!strcmp( dimorient , "x" ))
    { dim_entry->coord_axis = COORD_X ; }
-  else if (!strcmp( dimorient , "y" )) 
+  else if (!strcmp( dimorient , "y" ))
    { dim_entry->coord_axis = COORD_Y ; }
-  else if (!strcmp( dimorient , "z" )) 
+  else if (!strcmp( dimorient , "z" ))
    { dim_entry->coord_axis = COORD_Z ; }
   else
    { dim_entry->coord_axis = COORD_C ; }
