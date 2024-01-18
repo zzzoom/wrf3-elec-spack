@@ -163,24 +163,6 @@
 
 #endif
 
-!-----------------------------------------------------------------------
-! Check that NSSL microphysics is not allowed for WRF-NMM run 
-!-----------------------------------------------------------------------
-#if (NMM_CORE == 1) || (HWRF == 1) 
-      DO i = 1, model_config_rec % max_dom
-         IF ( model_config_rec % mp_physics(i) == nssl_2mom .OR. &
-              model_config_rec % mp_physics(i) == nssl_2momccn .OR. & 
-              model_config_rec % mp_physics(i) == nssl_1mom .OR. & 
-              model_config_rec % mp_physics(i) == nssl_1momlfo .OR. & 
-              model_config_rec % mp_physics(i) == nssl_2momg ) THEN 
-            wrf_err_message = '--- ERROR: Chosen microphysics scheme cannot run with WRF-NMM '
-            CALL wrf_message ( wrf_err_message )
-            wrf_err_message = '--- Fix mp_physics in namelist.input '
-         CALL wrf_debug ( 0, TRIM( wrf_err_message ) )
-         count_fatal_error = count_fatal_error + 1
-         END IF
-      ENDDO
-#endif
 
 !-----------------------------------------------------------------------
 ! Check that all values of sf_surface_physics are the same for all domains
@@ -1633,11 +1615,6 @@
          CALL wrf_message ( wrf_err_message )
       END IF
 
-
-!-----------------------------------------------------------------------
-!  MUST BE AFTER ALL OF THE PHYSICS CHECKS.
-!-----------------------------------------------------------------------
-
       IF ( count_fatal_error .GT. 0 ) THEN
          WRITE (wrf_err_message, FMT='(A,I6, A)') 'NOTE:  ', count_fatal_error, &
                                             ' namelist settings are wrong. Please check and reset these options'
@@ -1950,6 +1927,41 @@
       ENDDO
 
 !-----------------------------------------------------------------------
+! Check for electrification options with NSSL scheme
+!-----------------------------------------------------------------------
+#if ( (EM_CORE == 1) && (WRF_ELEC == 1) )
+     IF ( model_config_rec % elec_physics > 0 ) THEN
+      DO i = 1, model_config_rec % max_dom
+       IF ( .not. ( model_config_rec % mp_physics(i) .EQ. NSSL_2MOM  .or. &
+                    model_config_rec % mp_physics(i) .EQ. NSSL_2MOMCCN ) ) THEN
+
+         wrf_err_message = '--- NOTE: Electrification only works with NSSL_2MOM or NSSL_2MOMCCN  ' 
+         CALL wrf_message ( wrf_err_message )
+!         model_config_rec % elec_physics = 0
+!         CALL wrf_error_fatal ( wrf_err_message )
+        ENDIF
+      ENDDO
+     ENDIF
+     
+     IF ( model_config_rec % max_dom > 1 ) THEN
+      DO i = 1, model_config_rec % max_dom - 1
+        IF ( model_config_rec % nssl_ipelec(i) > 0 ) THEN
+         model_config_rec % nssl_ipelec(i) = 0
+         wrf_err_message = '--- NOTE: nssl_ipelec should only be nonzero on innermost domain, setting:  ' // &
+                           'nssl_ipelec = 0 on this domain '
+         CALL wrf_message ( wrf_err_message )
+       
+        ENDIF
+      ENDDO
+     ENDIF
+
+#else
+         wrf_err_message = '--- NOTE: WRF is not compiled for electrification, setting: ' // &
+          'elec_physics = 0'
+         CALL wrf_message_fatal ( wrf_err_message )
+    model_config_rec % elec_physics = 0
+#endif
+!-----------------------------------------------------------------------
 ! Set the namelist parameters for the RRTMG radiation scheme if either
 ! ra_lw_physics = RRTMG_LWSCHEME or ra_sw_physics = RRTMG_SWSCHEME.
 !-----------------------------------------------------------------------
@@ -1992,26 +2004,6 @@
       WRITE (wrf_err_message, FMT='(A,I6)') '--- NOTE: num_soil_layers has been set to ', &
                                              model_config_rec % num_soil_layers
       CALL wrf_message ( wrf_err_message )
-
-!-----------------------------------------------------------------------
-!  The P3 MP schemes must be used with the RRTMG radiation schemes.
-!-----------------------------------------------------------------------
-
-      DO i = 1, model_config_rec % max_dom
-         IF ( ( model_config_rec % mp_physics(i) .EQ. P3_1CATEGORY    )   .OR.  &
-              ( model_config_rec % mp_physics(i) .EQ. P3_1CATEGORY_NC ) ) THEN
-
-            IF ( ( ( model_config_rec % ra_lw_physics(i) .EQ. RRTMG_LWSCHEME      )   .OR.   &
-                   ( model_config_rec % ra_lw_physics(i) .EQ. RRTMG_LWSCHEME_FAST ) ) .AND.  &
-                 ( ( model_config_rec % ra_sw_physics(i) .EQ. RRTMG_SWSCHEME      )   .OR.   &
-                   ( model_config_rec % ra_sw_physics(i) .EQ. RRTMG_SWSCHEME_FAST ) ) ) THEN
-               !  No op, everything is fine. This is just easier logic to understand
-            ELSE
-               wrf_err_message = '--- ERROR: P3 MP (mp_physics=50 or 51) requires using RRTMG LW and SW schemes.'
-               CALL wrf_error_fatal ( TRIM( wrf_err_message ) )
-            END IF
-         END IF
-      END DO
 
    END SUBROUTINE set_physics_rconfigs
 

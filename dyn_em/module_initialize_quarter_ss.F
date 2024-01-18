@@ -28,6 +28,11 @@ MODULE module_initialize_ideal
 #endif
 
 
+  real, private :: ugrid = 0.0        ! east-west grid motion (subtracted from U wind component)
+  real, private :: vgrid = 0.0        ! north-south grid motion (subtracted from V wind component)
+  logical :: use_snd_plevels = .false. ! whether to read in pressure from the sounding file and use the same levels
+  logical :: use_snd_zlevels = .false. ! whether to use Z levels the sounding file and create pressure
+
 CONTAINS
 
 
@@ -80,18 +85,36 @@ CONTAINS
                                   ids, ide, jds, jde, kds, kde, &
                                   ims, ime, jms, jme, kms, kme, &
                                   its, ite, jts, jte, kts, kte, &
-                                  i, j, k
+                                  i, j, k, n
 
    ! Local data
 
    INTEGER, PARAMETER :: nl_max = 1000
-   REAL, DIMENSION(nl_max) :: zk, p_in, theta, rho, u, v, qv, pd_in
+   REAL, DIMENSION(nl_max) :: zk, p_in, theta, rho, u, v, qv, pd_in, etal
+   REAL, DIMENSION(nl_max) :: alttde
+   REAL    :: tmp_v_1, tmp_v_2, tmp_1, tmp_2
    INTEGER :: nl_in , icount
 
 
-   INTEGER :: icm,jcm, ii, im1, jj, jm1, loop, error, fid, nxc, nyc
+   INTEGER :: icm,jcm, ii, im1, jj, jm1, loop, error, fid
+   
+   
+   INTEGER :: nxc=-1, nyc=-1
+   REAL    :: delt = 5.
+   real    :: pres, qvs, rh, qvs1
+   real    :: zradbub = 1500.
+   real    :: xradbub = 10000.
+   real    :: yradbub = 10000.
+   logical :: use_eta_levels = .false.
+   integer, parameter :: maxbub = 10
+   integer :: numbub = 1
+   integer :: nxb(maxbub) = -1 , nyb(maxbub) = -1
+
+   logical :: setccn = .false.
+   
+   integer :: istat
    REAL    :: u_mean,v_mean, f0, p_surf, p_level, qvf, z_at_v, z_at_u
-   REAL    :: z_scale, xrad, yrad, zrad, rad, delt, cof1, cof2
+   REAL    :: z_scale, xrad, yrad, zrad, rad, cof1, cof2
 !   REAL, EXTERNAL :: interp_0
    REAL    :: hm
    REAL    :: pi
@@ -100,14 +123,19 @@ CONTAINS
    REAL    :: vnu, xnu, xnus, dinit0, cbh, p0_temp, t0_temp, zd, zt
    REAL    :: qvf1, qvf2, pd_surf
    INTEGER :: it
-   real :: thtmp, ptmp, temp(3)
+   real :: thtmp, ptmp, tem, temp(3)
 
    LOGICAL :: moisture_init
    LOGICAL :: stretch_grid, dry_sounding
+   logical :: moisten = .false.
 
   INTEGER :: xs , xe , ys , ye
   REAL :: mtn_ht
    LOGICAL, EXTERNAL :: wrf_dm_on_monitor
+
+   NAMELIST /init_ideal/ nxc,nyc,delt,use_eta_levels, &
+        ugrid,vgrid,setccn,use_snd_plevels,use_snd_zlevels,numbub,nxb,nyb, &
+        xradbub,yradbub,zradbub,moisten
 
    SELECT CASE ( model_data_order )
          CASE ( DATA_ORDER_ZXY )
@@ -150,14 +178,30 @@ CONTAINS
    END SELECT
 
 
-   stretch_grid = .true.
-   delt = 3.
+   
+  open(15,file="namelist.input",status='old',form='formatted')
+  rewind(15)
+  read(15,NML=init_ideal,iostat=istat) ! returning iostat prevents bombing if the namelist does not exist
+  close(15)
+   
+   stretch_grid = .not. ( use_eta_levels .or. use_snd_plevels .or. use_snd_zlevels ) ! .true.
+!   delt = 5.
 !   z_scale = .50
    z_scale = .40
    pi = 2.*asin(1.0)
    write(6,*) ' pi is ',pi
-   nxc = (ide-ids)/2
-   nyc = (jde-jds)/2
+   IF ( nxc <= 0 .and. nxb(1) <= 0) THEN
+      nxc = (ide-ids)/3 + 1
+      nxb(1) = nxc
+ !  ELSE 
+ !    nxb(1) = nxc
+   ENDIF
+   IF ( nyc <= 0 .and. nyb(1) <= 0 ) THEN
+      nyc = (jde-jds)/2 + 1
+      nyb(1) = nyc
+ !  ELSE
+ !     nyb(1) = nyc
+   ENDIF
 
    CALL model_to_grid_config_rec ( grid%id , model_config_rec , config_flags )
 
@@ -225,9 +269,31 @@ CONTAINS
                                 (1.-exp(-1./z_scale))
      ENDDO
    ELSE
-     DO k=1, kde
-      grid%znw(k) = 1. - float(k-1)/float(kde-1)
+
+    IF ( use_snd_plevels .or. use_snd_zlevels ) THEN
+    CALL get_sounding( zk, p_in, pd_in, theta, rho, u, v, qv, etal, dry_sounding, nl_max, nl_in )
+     grid%znw(1) = 1.0
+     write(6,*) 'eta levels:'
+     write(6,*) 'k, eta'
+     write(6,*) 1,grid%znw(1)
+     DO k=2, kde
+      grid%znw(k) = 0.5*( etal(k) + etal(k+1) )
+     write(6,*) k,grid%znw(k)
      ENDDO
+     
+      write(6,"( 5(f10.7,',',1x))") (grid%znw(k), k=1,kde)
+    
+    ELSEIF ( use_eta_levels ) THEN
+
+     DO k=1, kde
+!      grid%znw(k) = 1. - float(k-1)/float(kde-1)
+!      grid%znw(k) = eta_levels(k)
+      grid%znw(k) = model_config_rec%eta_levels(k)
+!      write(6,*) 'k,eta = ',k,grid%znw(k) 
+     ENDDO
+     
+     
+     ENDIF
    ENDIF
 
    DO k=1, kde-1
@@ -277,7 +343,7 @@ CONTAINS
   IF ( wrf_dm_on_monitor() ) THEN
   write(6,*) ' getting dry sounding for base state '
 
-  CALL get_sounding( zk, p_in, pd_in, theta, rho, u, v, qv, dry_sounding, nl_max, nl_in )
+  CALL get_sounding( zk, p_in, pd_in, theta, rho, u, v, qv, etal, dry_sounding, nl_max, nl_in )
   ENDIF
   CALL wrf_dm_bcast_real( zk , nl_max )
   CALL wrf_dm_bcast_real( p_in , nl_max )
@@ -295,6 +361,13 @@ CONTAINS
 !  and find surface pressure
 
   grid%p_top = interp_0( p_in, zk, config_flags%ztop, nl_in )
+
+  IF ( use_eta_levels ) THEN
+    grid%p_top = Max( grid%p_top_requested, p_in(nl_in) )
+    write(6,*) 'ptop,p_top_requested,p_in(nl_in) = ',grid%p_top,grid%p_top_requested,p_in(nl_in)
+  ENDIF
+
+  IF ( use_snd_plevels .or. use_snd_zlevels ) grid%p_top = p_in(nl_in)
 
   DO j=jts,jte
   DO i=its,ite
@@ -376,7 +449,7 @@ CONTAINS
 
   write(6,*) ' getting moist sounding for full state '
   dry_sounding = .false.
-  CALL get_sounding( zk, p_in, pd_in, theta, rho, u, v, qv, dry_sounding, nl_max, nl_in )
+  CALL get_sounding( zk, p_in, pd_in, theta, rho, u, v, qv, etal, dry_sounding, nl_max, nl_in )
 
   DO J = jts, min(jde-1,jte)
   DO I = its, min(ide-1,ite)
@@ -403,6 +476,16 @@ CONTAINS
       grid%t_1(i,k,j)          = interp_0( theta, pd_in, p_level, nl_in ) - t0
       grid%t_2(i,k,j)          = grid%t_1(i,k,j)
       
+      IF ( f_qnn .and. setccn ) THEN
+       IF ( config_flags%mp_physics == wdm5scheme .or. config_flags%mp_physics == wdm6scheme ) THEN
+         scalar(i,k,j,P_QNN) = grid%ccn_conc
+       ELSEIF ( config_flags%mp_physics == nssl_2momccn ) THEN
+!       ELSEIF ( config_flags%mp_physics == nssl_2momccn .or. config_flags%mp_physics == nssl_3mom ) THEN
+         scalar(:,:,:,P_QNN) = grid%nssl_cccn/1.225
+       ELSE
+         scalar(:,:,:,P_QNN) = grid%ccn_conc
+       ENDIF
+      ENDIF
 
     enddo
 
@@ -466,14 +549,17 @@ CONTAINS
 
 !  thermal perturbation to kick off convection
 
-  write(6,*) ' nxc, nyc for perturbation ',nxc,nyc
+  DO n = 1,numbub
+  write(6,*) ' nxc, nyc for perturbation ',nxb(n),nyb(n)
+  ENDDO
   write(6,*) ' delt for perturbation ',delt
 
+  
   DO J = jts, min(jde-1,jte)
-    yrad = config_flags%dy*float(j-nyc)/10000.
+    yrad = config_flags%dy*float(j-nyc)/yradbub
 !   yrad = 0.
     DO I = its, min(ide-1,ite)
-      xrad = config_flags%dx*float(i-nxc)/10000.
+      xrad = config_flags%dx*float(i-nxc)/xradbub
 !     xrad = 0.
       DO K = 1, kte-1
 
@@ -481,18 +567,46 @@ CONTAINS
 !  the mass in the column is not changing, so when theta changes,
 !  we recompute density and geopotential
 
+        
+        DO n = 1,numbub
+         yrad = config_flags%dy*float(j-nyb(n))/yradbub
+         xrad = config_flags%dx*float(i-nxb(n))/xradbub
+         
         zrad = 0.5*(grid%ph_1(i,k,j)+grid%ph_1(i,k+1,j)  &
                    +grid%phb(i,k,j)+grid%phb(i,k+1,j))/g
-        zrad = (zrad-1500.)/1500.
+        zrad = (zrad-zradbub)/zradbub
         RAD=SQRT(xrad*xrad+yrad*yrad+zrad*zrad)
         IF(RAD <= 1.) THEN
+           thtmp   = grid%t_1(i,k,j) + t0
            grid%t_1(i,k,j)=grid%t_1(i,k,j)+delt*COS(.5*PI*RAD)**2
            grid%t_2(i,k,j)=grid%t_1(i,k,j)
            qvf = 1. + rvovrd*moist(i,k,j,P_QV)
            grid%alt(i,k,j) = (r_d/p1000mb)*(grid%t_1(i,k,j)+t0)*qvf* &
                         (((grid%p(i,k,j)+grid%pb(i,k,j))/p1000mb)**cvpm)
            grid%al(i,k,j) = grid%alt(i,k,j) - grid%alb(i,k,j)
+           IF ( moisten ) THEN
+
+            pres  = grid%pb(i,k,j) ! psfc*pz(k)**(cp/rd)
+         !   thtmp   = grid%t_1(i,k,j) - delt*COS(.5*PI*RAD)**2
+            ptmp    = grid%p(i,k,j)+grid%pb(i,k,j)
+            tem = thtmp * (ptmp/p1000mb)**rcp
+            qvs   = 380.*exp(17.27*(tem-273.16) / (tem - 36.)) / ptmp
+!            qvs   = 380.*exp(17.27*(pz(k)*tz(k)-273.16) / (pz(k)*tz(k)- 36.)) / pres
+            rh    =  moist(i,k,j,P_QV) / qvs
+
+            thtmp   = grid%t_1(i,k,j) + t0 ! this is the warmed theta
+            tem = thtmp * (ptmp/p1000mb)**rcp
+            
+            qvs1  =  380.*exp(17.27*(tem-273.16) / (tem - 36.)) / ptmp
+            
+            write(0,*) 'i,j,k,pres,thtmp,tem,qvs,rh,qvs1 = ',i,j,k,pres,thtmp,tem,qvs,rh,qvs1
+            
+            moist(i,k,j,P_QV) = rh*qvs1
+!            qv3(i,j,k) = rh*qvs1
+             
+           ENDIF
         ENDIF
+        ENDDO
       ENDDO
 
 !  rebalance hydrostatically
@@ -510,6 +624,25 @@ CONTAINS
   ENDDO
 
 !#endif
+! ub>>
+! Use the hypsometric equation to calculate altitudes (m) at the chosen
+! eta (sigma-ish) coordinates.
+
+   alttde(1) = 0.0
+   do k = 2, kde-1
+     write(6,*) ' '
+     write(6,*) 'k: ', k
+     tmp_1 = (grid%t_1(its,k-1,jts)+t0) * ( (grid%p(its,k-1,jts)+grid%pb(its,k-1,jts)) / 100000.0 )**0.286
+     tmp_2 = (grid%t_1(its,k  ,jts)+t0) * ( (grid%p(its,k  ,jts)+grid%pb(its,k  ,jts)) / 100000.0 )**0.286
+     tmp_v_1 = tmp_1 * ( 1.0 + rvovrd*moist(its,k-1,jts,P_QV) )
+     tmp_v_2 = tmp_2 * ( 1.0 + rvovrd*moist(its,k  ,jts,P_QV) )
+     alttde(k) = alttde(k-1) &
+               +  ( ( ( 287.0*(tmp_v_1+tmp_v_2)/2.0 ) / 9.81 ) &
+                    * log( (grid%p(its,k-1,jts)+grid%pb(its,k-1,jts))/(grid%p(its,k,jts)+grid%pb(its,k,jts)) ) )
+     WRITE(6,*) 'alttde = ', alttde(k), alttde(k)-alttde(k-1), grid%p(its,k-1,jts), grid%pb(its,k-1,jts), grid%t_1(its,k-1,jts), t0
+   end do
+! ub<<
+
 
    IF ( wrf_dm_on_monitor() ) THEN
    write(6,*) ' grid%mu_1 from comp ', grid%mu_1(1,1)
@@ -585,6 +718,14 @@ CONTAINS
   ENDDO
   ENDDO
   ENDDO
+
+! ub>>
+  write (6,*) ' kts,kte=',kts,kte
+  write (6,'(A3,x,7A10)') 'k','z of eta','dz of eta','theta','qv','u'
+  do k = kts, kte-1
+    write(6,'(I3,x,7F10.3)') k, alttde(k), alttde(k)-alttde(Max(1,k-1)),grid%t_1(its,k,jts)+t0,moist(its,k,jts,P_QV)/(1.+moist(its,k,jts,P_QV))*1000.0,grid%u_1(its,k,jts)
+  end do
+! ub<<
 
 !  set a few more things
 
@@ -698,12 +839,12 @@ CONTAINS
 !---------------------------------------------------------------------------
 
       subroutine get_sounding( zk, p, p_dry, theta, rho, &
-                               u, v, qv, dry, nl_max, nl_in )
+                               u, v, qv, etal, dry, nl_max, nl_in )
       implicit none
 
       integer nl_max, nl_in
       real zk(nl_max), p(nl_max), theta(nl_max), rho(nl_max), &
-           u(nl_max), v(nl_max), qv(nl_max), p_dry(nl_max)
+           u(nl_max), v(nl_max), qv(nl_max), p_dry(nl_max), etal(nl_max)
       logical dry
 
       integer n
@@ -733,7 +874,7 @@ CONTAINS
 !  first, read the sounding
 
       call read_sounding( p_surf, th_surf, qv_surf, &
-                          h_input, th_input, qv_input, u_input, v_input,n, nl, debug )
+                          h_input, th_input, qv_input, u_input, v_input,pm_input,n, nl, debug )
 
       if(dry) then
        do k=1,nl
@@ -776,10 +917,14 @@ CONTAINS
           rho_input(1) = rho_surf
           dz = h_input(1)
           do it=1,10
+            IF ( .not. use_snd_plevels ) THEN
             pm_input(1) = p_surf &
                     - 0.5*dz*(rho_surf+rho_input(1))*g*qvf1
+            ENDIF
             rho_input(1) = 1./((r/p1000mb)*th_input(1)*qvf*((pm_input(1)/p1000mb)**cvpm))
           enddo
+
+     IF ( use_snd_plevels ) etal(1) = 1.
 
 ! integrate up the column
 
@@ -789,7 +934,12 @@ CONTAINS
             qvf1 = 0.5*(2.+(qv_input(k-1)+qv_input(k)))
             qvf = 1. + rvovrd*qv_input(k)   ! qv is in g/kg here
  
+            IF ( use_snd_plevels ) THEN
+              etal(k) = (pm_input(k) - pm_input(nl))/(pm_input(1) - pm_input(nl))
+            ENDIF
+ 
             do it=1,10
+             IF ( .not. use_snd_plevels ) THEN
               pm_input(k) = pm_input(k-1) &
                       - 0.5*dz*(rho_input(k)+rho_input(k-1))*g*qvf1
               IF(pm_input(k) .LE. 0. )THEN
@@ -797,9 +947,17 @@ CONTAINS
                 WRITE(message,*)'k,pm_input(k),h_input(k),th_input(k) = ',k,pm_input(k),h_input(k),th_input(k)
                 CALL wrf_error_fatal ( message )
               ENDIF
+              ENDIF
               rho_input(k) = 1./((r/p1000mb)*th_input(k)*qvf*((pm_input(k)/p1000mb)**cvpm))
             enddo
           enddo
+
+          IF ( use_snd_zlevels ) THEN
+            etal(1) = 1.
+            do k=2,nl
+              etal(k) = (pm_input(k) - pm_input(nl))/(pm_input(1) - pm_input(nl))
+            enddo
+          ENDIF
 
 !  we have the moist sounding
 
@@ -821,18 +979,29 @@ CONTAINS
           p_dry(k) = p_input(k)
           theta(k) = th_input(k)
           rho(k) = rho_input(k)
-          u(k) = u_input(k)
-          v(k) = v_input(k)
+          u(k) = u_input(k) - ugrid
+          v(k) = v_input(k) - vgrid
           qv(k) = qv_input(k)
 
         enddo
 
      if(debug) then
       write(6,*) ' sounding '
+
+      IF ( use_snd_plevels ) THEN
+      write(6,*) '  k  height(m)  press (Pa) pd(Pa) theta (K) den(kg/m^3)  u(m/s)     v(m/s)    qv(g/g) eta '
+      do k=1,nl
+        write(6,'(1x,i3,8(1x,1pe10.3))') k, zk(k), p(k), p_dry(k), theta(k), rho(k), u(k), v(k), qv(k),etal(k)
+      enddo
+
+      ELSE
+
       write(6,*) '  k  height(m)  press (Pa) pd(Pa) theta (K) den(kg/m^3)  u(m/s)     v(m/s)    qv(g/g) '
       do k=1,nl
         write(6,'(1x,i3,8(1x,1pe10.3))') k, zk(k), p(k), p_dry(k), theta(k), rho(k), u(k), v(k), qv(k)
       enddo
+
+      ENDIF
 
      end if
 
@@ -840,21 +1009,25 @@ CONTAINS
 
 !-------------------------------------------------------
 
-      subroutine read_sounding( ps,ts,qvs,h,th,qv,u,v,n,nl,debug )
+      subroutine read_sounding( ps,ts,qvs,h,th,qv,u,v,p,n,nl,debug )
       implicit none
       integer n,nl
-      real ps,ts,qvs,h(n),th(n),qv(n),u(n),v(n)
+      real ps,ts,qvs,h(n),th(n),qv(n),u(n),v(n),p(n)
+      real h0,pfac
       logical end_of_file
       logical debug
 
       integer k
 
+      pfac = 1.0
       open(unit=10,file='input_sounding',form='formatted',status='old')
       rewind(10)
       read(10,*) ps, ts, qvs
+      IF ( ps > 10000. ) pfac = 0.01
+      ps = ps*pfac
       if(debug) then
         write(6,*) ' input sounding surface parameters '
-        write(6,*) ' surface pressure (mb) ',ps
+        write(6,*) ' surface pressure (mb) ',ps*pfac
         write(6,*) ' surface pot. temp (K) ',ts
         write(6,*) ' surface mixing ratio (g/kg) ',qvs
       end if
@@ -862,6 +1035,23 @@ CONTAINS
       end_of_file = .false.
       k = 0
 
+      IF ( use_snd_plevels ) THEN
+      
+      do while (.not. end_of_file)
+
+        read(10,*,end=200) h(k+1), th(k+1), qv(k+1), u(k+1), v(k+1), p(k+1)
+        IF ( k == 0 ) h0 = h(k+1)
+!        p(k+1) = p(k+1)*pfac
+        k = k+1
+        h(k) = h(k) - h0
+        if(debug) write(6,'(1x,i3,5(1x,e10.3))') k, h(k), th(k), qv(k), u(k), v(k), p(k)
+        go to 210
+ 200    end_of_file = .true.
+ 210    continue
+      enddo
+      
+      ELSE
+      
       do while (.not. end_of_file)
 
         read(10,*,end=100) h(k+1), th(k+1), qv(k+1), u(k+1), v(k+1)
@@ -871,6 +1061,8 @@ CONTAINS
  100    end_of_file = .true.
  110    continue
       enddo
+
+      ENDIF
 
       nl = k
 

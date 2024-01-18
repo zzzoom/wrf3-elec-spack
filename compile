@@ -132,6 +132,7 @@ else
   if ( ! $?WRF_COAMPS_CORE ) setenv WRF_COAMPS_CORE 0
   if ( ! $?WRF_EXP_CORE )    setenv WRF_EXP_CORE 0
   if ( ! $?WRF_CHEM )        setenv WRF_CHEM 0
+  if ( ! $?WRF_ELEC )        setenv WRF_ELEC 0
   if ( ! $?WRF_DFI_RADAR )   setenv WRF_DFI_RADAR 0
   if ( ! $?HWRF )            setenv HWRF 0
   if ( ! $?WRF_CONVERT ) then
@@ -165,6 +166,14 @@ else
     echo "  "
     echo "You need to download and untar the chem code, or"
     echo "unset the WRF_CHEM env variable."
+    echo "  "
+    exit
+  endif
+
+  if ( ( $WRF_ELEC == 1 )  && ( ! -d elec ) ) then
+    echo "  "
+    echo "You need to download and untar the elec code, or"
+    echo "unset the WRF_ELEC env variable."
     echo "  "
     exit
   endif

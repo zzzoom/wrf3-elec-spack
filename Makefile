@@ -10,7 +10,11 @@ CHEM_FILES =	../chem/module_aerosols_sorgam.o \
 		../chem/module_input_tracer.o \
 		../chem/module_aerosols_soa_vbs.o
 CHEM_FILES2 =	../chem/module_data_mosaic_asect.o
-
+ELEC_FILES = ../elec/module_commasmpi.o \
+             ../elec/module_mp_boxmgsetup.o \
+             ../elec/module_mp_screen.o \
+             ../elec/module_mp_discharge.o \
+             ../elec/include_microphysics_driver_elec.F
 deflt :
 		@ echo Please compile the code using ./compile
 
@@ -94,6 +98,7 @@ framework_only : configcheck
 wrf : framework_only
 	$(MAKE) MODULE_DIRS="$(ALL_MODULES)" physics
 	if [ $(WRF_CHEM) -eq 1 ]    ; then $(MAKE) MODULE_DIRS="$(ALL_MODULES)" chemics ; fi
+	if [ $(WRF_ELEC) -eq 1 ]    ; then $(MAKE) MODULE_DIRS="$(ALL_MODULES)" elecphys ; fi
 	if [ $(WRF_EM_CORE) -eq 1 ]    ; then $(MAKE) MODULE_DIRS="$(ALL_MODULES)" em_core ; fi
 	if [ $(WRF_NMM_CORE) -eq 1 ]   ; then $(MAKE) MODULE_DIRS="$(ALL_MODULES)" nmm_core ; fi
 	if [ $(WRF_EXP_CORE) -eq 1 ]   ; then $(MAKE) MODULE_DIRS="$(ALL_MODULES)" exp_core ; fi
@@ -918,12 +923,24 @@ chemics :
 #	( cd chem ; $(MAKE) )
 #	( cd chem ; $(MAKE) $(J) )
 
+elecphys :
+	@ echo '--------------------------------------'
+	( cd elec ; $(MAKE) )
+
 physics :
 	@ echo '--------------------------------------'
 	if [ $(WRF_CHEM) -eq 0 ] ; then \
-		( cd phys ; $(MAKE) CF2=" " ) ; \
+		if [ $(WRF_ELEC) -eq 0 ] ; then \
+		  ( cd phys ; $(MAKE) CF2=" " EF=" " ) ; \
+		else \
+		  ( cd phys ; $(MAKE) EF="$(ELEC_FILES)" ) ; \
+		fi \
 	else \
-		( cd phys ; $(MAKE) CF2="$(CHEM_FILES2)" ) ; \
+		if [ $(WRF_ELEC) -eq 0 ] ; then \
+		  ( cd phys ; $(MAKE) CF2="$(CHEM_FILES2)" EF=" ") ; \
+		else \
+		  ( cd phys ; $(MAKE) CF2="$(CHEM_FILES2)"  EF="$(ELEC_FILES)" ) ; \
+		fi \
 	fi
 
 em_core :
