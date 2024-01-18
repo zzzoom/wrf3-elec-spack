@@ -225,6 +225,8 @@ CONTAINS
                          ,G_URB2D_mosaic,RN_URB2D_mosaic                                                      & ! danli mosaic 
                          ,TS_URB2D_mosaic                                                                     & ! danli mosaic 
                          ,TS_RUL2D_mosaic                                                                     & ! danli mosaic
+!                         ,qnn_curr   &
+!                         , F_QNN   &
                          )
 
 !-----------------------------------------------------------------
@@ -486,6 +488,7 @@ CONTAINS
    REAL,    OPTIONAL, DIMENSION(ims:ime,5,jms:jme), INTENT(IN ) :: CROPTYPE
 
 !   REAL, DIMENSION( ims:ime, kms:kme, jms:jme ),  OPTIONAL,  INTENT(INOUT ) ::   qnn_curr
+!   LOGICAL, OPTIONAL, intent(in) :: f_qnn
 
    INTEGER , OPTIONAL,  INTENT(OUT) :: STEPWTD
    REAL , OPTIONAL, INTENT(IN) :: WTDDT
@@ -1030,7 +1033,29 @@ integer myproc
                 its, ite, jts, jte, kts, kte                       )
    ENDIF
 
-  ENDIF !}
+!   IF ( present( f_qnn ) ) THEN
+   IF ( f_qnn ) THEN
+! Initialize simple ccn field
+     IF ( scalar((ite+itf)/2,(kte+ktf)/2,(jte+jtf)/2,p_qnn) < 1.0 ) THEN ! initialize ccn if not already done
+       DO j=jts,jtf
+         DO k=kts,ktf
+          DO i=its,itf
+           IF ( config_flags%mp_physics == wdm5scheme .or. config_flags%mp_physics == wdm6scheme ) THEN
+             scalar(i,k,j,p_qnn) = ccn_conc
+           ELSEIF ( config_flags%mp_physics == nssl_2momccn ) THEN
+             scalar(i,k,j,p_qnn) = nssl_cccn/1.225
+             ccn_conc =  nssl_cccn/1.225
+           ELSE
+             scalar(i,k,j,p_qnn) = ccn_conc
+           ENDIF
+          ENDDO
+         ENDDO
+        ENDDO
+      ENDIF
+   ENDIF
+   ENDIF
+   
+!  ENDIF !}
 
 !-- convert zfull and zhalf to sigma values for ra_init (Eta CO2 needs these)
 !-- zfull/zhalf may be either zeta or eta
@@ -3732,7 +3757,7 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
      SELECT CASE(config_flags%mp_physics)
      CASE (NSSL_2MOM,NSSL_2MOMCCN)
        IF ( config_flags%elec_physics > 0 ) THEN
-         nssl_ipelec_tmp = nssl_ipelec
+         nssl_ipelec_tmp = Max(1,nssl_ipelec)
        ELSE
          nssl_ipelec_tmp = 0.0
        ENDIF
