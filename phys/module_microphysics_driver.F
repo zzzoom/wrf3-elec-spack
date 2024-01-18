@@ -602,10 +602,10 @@ REAL, DIMENSION( ims:ime, kms:kme, jms:jme ),                        &
                        ,f_qic_effr,f_qip_effr,f_qid_effr &
                       ,f_qic,f_qip,f_qid &
                       ,f_qnic,f_qnip,f_qnid                                  &
+                       ,f_scw,f_scr,f_sci,f_scs,f_sch,f_schl,f_sciona & ! lightning
 #ifdef WRF_ELEC
 ! Explicit lightning
                        ,f_elecx                                 & !lightning
-                       ,f_scw,f_scr,f_sci,f_scs,f_sch,f_schl,f_sciona & ! lightning
 #endif
                        ,f_qzi,f_qzs,f_qzg,f_qzh,f_qvolg,f_qvolh              &
                        ,f_qrimef                                             &
