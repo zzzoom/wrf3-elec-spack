@@ -225,7 +225,7 @@ CONTAINS
                          ,G_URB2D_mosaic,RN_URB2D_mosaic                                                      & ! danli mosaic 
                          ,TS_URB2D_mosaic                                                                     & ! danli mosaic 
                          ,TS_RUL2D_mosaic                                                                     & ! danli mosaic
-                         ,qnn_curr, F_QNN   &
+                         ,qnn_curr,fqnn   &
                          )
 
 !-----------------------------------------------------------------
@@ -487,7 +487,7 @@ CONTAINS
    REAL,    OPTIONAL, DIMENSION(ims:ime,5,jms:jme), INTENT(IN ) :: CROPTYPE
 
    REAL, DIMENSION( ims:ime, kms:kme, jms:jme ),  OPTIONAL,  INTENT(INOUT ) ::   qnn_curr
-   LOGICAL, OPTIONAL, intent(in) :: f_qnn
+   LOGICAL, OPTIONAL, intent(in) :: fqnn
 
    INTEGER , OPTIONAL,  INTENT(OUT) :: STEPWTD
    REAL , OPTIONAL, INTENT(IN) :: WTDDT
@@ -1032,8 +1032,8 @@ integer myproc
                 its, ite, jts, jte, kts, kte                       )
    ENDIF
 
-   IF ( present( f_qnn ) ) THEN
-   IF ( f_qnn ) THEN
+   IF ( present( fqnn ) ) THEN
+   IF ( fqnn ) THEN
 ! Initialize simple ccn field
      IF ( qnn_curr((ite+itf)/2,(kte+ktf)/2,(jte+jtf)/2) < 1.0 ) THEN ! initialize ccn if not already done
        DO j=jts,jtf
